@@ -1,0 +1,109 @@
+{
+  "design": {
+    "ki": 1200.0,
+    "encNoiseUrad": 0.0,
+    "encResUrad": 1e-06
+  },
+  "formula": "eventually[0, 0.4] ( always[0, 5] los_error_urad < 50 )",
+  "cases": [
+    {
+      "scenario": {},
+      "fidelity": "low",
+      "rho": 42.60320319004183,
+      "peak": 601.5344190254667,
+      "e_at_0_4": 7.396796809958169
+    },
+    {
+      "scenario": {},
+      "fidelity": "high",
+      "rho": 39.78520371359709,
+      "peak": 634.7240389364324,
+      "e_at_0_4": 10.214796286402906
+    },
+    {
+      "scenario": {
+        "temp_c": -40
+      },
+      "fidelity": "low",
+      "rho": 42.550120767856654,
+      "peak": 549.6845038959752,
+      "e_at_0_4": 7.449879232143342
+    },
+    {
+      "scenario": {
+        "temp_c": -40
+      },
+      "fidelity": "high",
+      "rho": 32.309259591546336,
+      "peak": 618.9971152063622,
+      "e_at_0_4": 17.69074040845366
+    },
+    {
+      "scenario": {
+        "temp_c": -22,
+        "battery": 0.84,
+        "shock_g": 22,
+        "shock_ms": 12
+      },
+      "fidelity": "low",
+      "rho": 41.034573727337616,
+      "peak": 674.3298933931617,
+      "e_at_0_4": 8.965426272662388
+    },
+    {
+      "scenario": {
+        "temp_c": -22,
+        "battery": 0.84,
+        "shock_g": 22,
+        "shock_ms": 12
+      },
+      "fidelity": "high",
+      "rho": 35.075674695308855,
+      "peak": 748.4286365024358,
+      "e_at_0_4": 14.924325304691145
+    },
+    {
+      "scenario": {
+        "axis_deg": 45,
+        "temp_c": 71
+      },
+      "fidelity": "low",
+      "rho": 44.769674816619556,
+      "peak": 425.3490668100177,
+      "e_at_0_4": 5.230325183380443
+    },
+    {
+      "scenario": {
+        "axis_deg": 45,
+        "temp_c": 71
+      },
+      "fidelity": "high",
+      "rho": 41.662873542685524,
+      "peak": 444.9785262154671,
+      "e_at_0_4": 8.337126457314477
+    },
+    {
+      "scenario": {
+        "shock_g": 18,
+        "shock_ms": 10,
+        "battery": 0.8
+      },
+      "fidelity": "low",
+      "rho": 43.980331761982335,
+      "peak": 494.3431642218807,
+      "e_at_0_4": 6.019668238017667
+    },
+    {
+      "scenario": {
+        "shock_g": 18,
+        "shock_ms": 10,
+        "battery": 0.8
+      },
+      "fidelity": "high",
+      "rho": 41.04791133977028,
+      "peak": 519.9033500637132,
+      "e_at_0_4": 8.952088660229718
+    }
+  ],
+  "cold_start_min_ratio": 1.5927873779113446
+}

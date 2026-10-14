@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>HWCI · Hardware verification bench</title>
+  <meta name="description" content="Proof of concept: load a STEP part, define executable requirements, and let a worst-case search try to break the design.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%2316181a'/%3E%3Cpath d='M16 6a10 10 0 0 1 10 10H16zM16 26A10 10 0 0 1 6 16h10z' fill='%23f2c200'/%3E%3Ccircle cx='16' cy='16' r='10' fill='none' stroke='%23f2c200' stroke-width='2'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Saira+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/app.css">
+  <script type="importmap">
+    { "imports": {
+        "three": "./vendor/three/three.module.js",
+        "three/addons/controls/OrbitControls.js": "./vendor/three/controls/OrbitControls.js"
+    } }
+  </script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true"></span>
+      <div>
+        <div class="brand-name">HWCI</div>
+        <div class="brand-sub">Hardware verification bench · proof of concept</div>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <span id="status" class="status" data-state="idle">No part loaded</span>
+      <button id="themeBtn" class="icon-btn" type="button" aria-label="Switch light or dark theme" title="Theme"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1.5a6.5 6.5 0 0 1 0 13z" fill="currentColor"/></svg></button>
+      <button id="runBtn" class="run-btn" type="button" disabled>
+        <span class="run-label">Run verification</span>
+      </button>
+    </div>
+    <div id="progress" class="progress" hidden><div class="progress-bar"></div></div>
+  </header>
+
+  <main class="layout">
+    <aside class="rail">
+      <section class="panel" aria-labelledby="h-part">
+        <h2 id="h-part"><span class="step">01</span>Part</h2>
+        <label class="drop" id="drop">
+          <input id="fileInput" type="file" accept=".step,.stp,.STEP,.STP">
+          <span class="drop-title">Drop a STEP file here</span>
+          <span class="drop-sub">or click to browse · .step / .stp · parsed locally, nothing is uploaded</span>
+        </label>
+        <div class="samples">
+          <span>Samples</span>
+          <button type="button" class="chip" data-sample="samples/payload_unbalanced.step">Camera payload, unbalanced</button>
+          <button type="button" class="chip" data-sample="samples/payload_balanced.step">Same, with counterweight</button>
+        </div>
+        <div id="partInfo" class="part-info" hidden></div>
+        <dl id="massTable" class="readout" hidden></dl>
+        <div id="balance" class="callout" hidden></div>
+      </section>
+
+      <section class="panel" aria-labelledby="h-drive">
+        <h2 id="h-drive"><span class="step">02</span>Axis &amp; drive</h2>
+        <div class="field-row">
+          <label class="field">Material
+            <select id="material"></select>
+          </label>
+          <label class="field narrow">Density kg/m³
+            <input id="density" type="number" min="100" max="25000" step="10">
+          </label>
+        </div>
+        <div class="field-row">
+          <div class="field">Tilt axis
+            <div class="seg" role="radiogroup" aria-label="Tilt axis" id="axisSeg">
+              <button type="button" role="radio" data-axis="x">X</button>
+              <button type="button" role="radio" data-axis="y">Y</button>
+              <button type="button" role="radio" data-axis="z">Z</button>
+            </div>
+          </div>
+          <label class="field">Axis passes through
+            <select id="pivot">
+              <option value="origin">Model origin</option>
+              <option value="bbox">Bounding-box centre</option>
+              <option value="centroid">Centre of mass</option>
+            </select>
+          </label>
+        </div>
+        <div class="field-row">
+          <label class="field">Motor peak torque N·m
+            <input id="tauMaxNom" type="number" min="0.01" step="0.05">
+          </label>
+          <label class="field">Rotor + frame inertia kg·m²
+            <input id="rotorInertia" type="number" min="0" step="0.001">
+          </label>
+        </div>
+        <details class="more">
+          <summary>Control loop and friction</summary>
+          <div class="field-row">
+            <label class="field">Loop bandwidth Hz <input id="bandwidthHz" type="number" min="1" max="200" step="1"></label>
+            <label class="field">Integral time s <input id="integralTime" type="number" min="0.01" max="5" step="0.01"></label>
+          </div>
+          <div class="field-row">
+            <label class="field">Running friction at 20 °C N·m <input id="runFriction20C" type="number" min="0" step="0.0005"></label>
+            <label class="field">Seal breakaway at 20 °C N·m <input id="sealBreakaway20C" type="number" min="0" step="0.01"></label>
+          </div>
+        </details>
+        <dl id="designTable" class="readout compact" hidden></dl>
+      </section>
+
+      <section class="panel" aria-labelledby="h-req">
+        <h2 id="h-req"><span class="step">03</span>Requirements</h2>
+        <p class="hint">Each requirement is executable: a temporal-logic formula, a scenario envelope to search, and a nominal point.</p>
+        <textarea id="reqText" spellcheck="false" aria-label="Requirements in YAML" wrap="off"></textarea>
+        <div id="reqStatus" class="req-status"></div>
+        <div class="row-actions">
+          <label class="toggle"><input id="mutationToggle" type="checkbox" checked> Mutation testing</label>
+          <span class="spacer"></span>
+          <button type="button" class="link-btn" id="reqReset">Reset</button>
+          <label class="link-btn">Open…<input id="reqFile" type="file" accept=".yaml,.yml" hidden></label>
+          <button type="button" class="link-btn" id="reqSave">Save</button>
+        </div>
+      </section>
+    </aside>
+
+    <section class="stage">
+      <div class="viewer-wrap">
+        <div id="viewer" class="viewer" aria-label="3D view of the part"></div>
+        <div id="viewerEmpty" class="viewer-empty">
+          <div class="ve-title">Load a part to begin</div>
+          <div class="ve-sub">The STEP geometry gives mass, inertia and the centre of mass. Those feed a gimbal model, and every requirement is searched for its worst case.</div>
+        </div>
+        <div id="viewerBusy" class="viewer-busy" hidden><span class="spinner"></span><span id="viewerBusyText">Reading STEP…</span></div>
+        <div class="viewer-tools" id="viewTools" hidden>
+          <button type="button" data-view="iso">Iso</button>
+          <button type="button" data-view="front">Front</button>
+          <button type="button" data-view="side">Side</button>
+          <button type="button" data-view="top">Top</button>
+        </div>
+        <div class="viewer-legend" id="viewLegend" hidden>
+          <span><i class="lg-axis"></i>Tilt axis</span>
+          <span><i class="lg-cg"></i>Centre of mass</span>
+          <span><i class="lg-off"></i>CG offset</span>
+        </div>
+      </div>
+
+      <section id="results" class="results" aria-live="polite">
+        <div class="intro">
+          <h2>How the bench works</h2>
+          <ol class="flow">
+            <li><b>Part</b><span>STEP → mass, inertia, CG offset from the tilt axis</span></li>
+            <li><b>Model</b><span>Gimbal with motor, friction, sensors and a re-tuned control loop</span></li>
+            <li><b>Search</b><span>Each requirement's envelope is searched for the scenario that breaks it</span></li>
+            <li><b>Mutants</b><span>Seeded defects test whether the requirement set would notice</span></li>
+          </ol>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <footer class="foot">
+    Proof of concept. The gimbal model and every default number are illustrative, not a product specification.
+    Geometry is read with OpenCascade (WebAssembly) in your browser; files never leave this machine.
+  </footer>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
